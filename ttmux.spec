@@ -1,5 +1,5 @@
 Name:           ttmux
-Version:        1.1.0
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Wrapper tmux pour attacher, lister ou créer une session avec un profil
 
@@ -33,6 +33,12 @@ install -D -m 0644 ttmux.1 %{buildroot}%{_mandir}/man1/ttmux.1
 %{_mandir}/man1/ttmux.1*
 
 %changelog
+* Sat May 09 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.2.0-1
+- Profil et flags de setup appliqués UNIQUEMENT à la création d'une
+  session. Sur une session existante, simple attache ; warning si des
+  flags ou un -p explicite étaient passés.
+- README : mention des Releases GitHub et section désinstallation.
+
 * Sat May 09 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.1.0-1
 - Support des profils ~/.ttmux/<nom> (par défaut "base").
 - Flag -p pour choisir un profil (nom ou chemin).

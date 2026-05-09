@@ -1,4 +1,4 @@
-.TH TTMUX 1 "2026-05-09" "ttmux 1.1.0" "User Commands"
+.TH TTMUX 1 "2026-05-09" "ttmux 1.2.0" "User Commands"
 .SH NAME
 ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
@@ -25,28 +25,34 @@ charger un fichier de
 et appliquer une suite de splits et de commandes décrits soit dans le
 profil, soit en ligne de commande, soit les deux.
 .PP
+Le profil et les flags de setup sont appliqués
+.B uniquement à la création
+d'une session. Sur une session existante,
+.B ttmux
+attache simplement (et émet un avertissement si des flags ou un
+.B \-p
+explicite étaient passés, pour signaler qu'ils ont été ignorés).
+.PP
 Si
 .B ttmux
 est appelé sans nom de session :
 .IP \(bu 2
 si aucune session tmux n'existe, une session nommée
 .B main
-est créée puis attachée (profil appliqué si présent) ;
+est créée (profil + flags appliqués) puis attachée ;
 .IP \(bu 2
-si une seule session existe, elle est attachée (profil appliqué si présent) ;
+si une seule session existe, elle est attachée (warning si flags ignorés) ;
 .IP \(bu 2
 si plusieurs sessions existent, la liste est affichée
-(\fItmux ls\fR) sans appliquer de profil.
+(\fItmux ls\fR).
 .PP
 Si un nom de session est fourni :
 .IP \(bu 2
-si la session existe : elle est attachée et le profil + les flags CLI
-sont appliqués sur le pane actif ;
+si la session existe : attache (warning si flags ignorés) ;
 .IP \(bu 2
-sinon : la session est créée, le profil + les flags CLI sont appliqués,
-puis la session est attachée.
+sinon : crée la session, applique le profil puis les flags CLI, attache.
 .PP
-L'ordre est toujours :
+L'ordre d'application est toujours :
 .B profil d'abord, ligne de commande ensuite.
 Lorsque
 .B ttmux

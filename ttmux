@@ -10,14 +10,18 @@ usage() {
   cat <<'EOF'
 Usage: ttmux [<session>] [-p <nom|chemin>] [-N] [-c <cmd>] [-h] [-v] ...
 
+Profil et flags de setup ne sont appliqués QU'À LA CRÉATION d'une
+session. Sur une session existante, attache simple ; warning si des
+flags ou un -p explicite étaient passés (ils sont ignorés).
+
 Sans argument :
-  - 0 session tmux → crée "main" et l'attache (profil appliqué si présent)
-  - 1 session      → attache (profil appliqué si présent)
-  - 2+ sessions    → liste (pas de profil appliqué)
+  - 0 session tmux → crée "main" (profil appliqué) puis attache
+  - 1 session      → attache (warning si flags ignorés)
+  - 2+ sessions    → liste
 
 Avec un nom :
-  - existante : attache puis applique profil + flags CLI sur le pane actif
-  - nouvelle  : crée la session, applique profil + flags CLI puis attache
+  - existante : attache (warning si flags ignorés)
+  - nouvelle  : crée la session, applique profil + flags CLI, attache
 
 Profil :
   Par défaut, si ~/.ttmux/base existe, son contenu est appliqué AVANT les
@@ -195,7 +199,41 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Résolution du profil -----------------------------------------------------
+# --- Routing : décider d'attacher ou de créer ---------------------------------
+# On ne charge le profil et n'applique les flags QUE lors d'une création.
+# Sur une session existante, on attache et on warn si l'utilisateur avait
+# passé des flags ou un -p explicite (le profil par défaut "base" est
+# silencieusement ignoré).
+will_create=0
+
+if [[ -z "$session" ]]; then
+  if ! tmux ls >/dev/null 2>&1; then
+    session="$DEFAULT_NAME"
+    will_create=1
+  else
+    count=$(tmux ls 2>/dev/null | wc -l)
+    if [[ "$count" -eq 1 ]]; then
+      session=$(tmux ls -F '#{session_name}' | head -n1)
+    else
+      tmux ls
+      exit 0
+    fi
+  fi
+else
+  if ! session_exists "$session"; then
+    will_create=1
+  fi
+fi
+
+if [[ $will_create -eq 0 ]]; then
+  if [[ ${#cli_flags[@]} -gt 0 || -n "$profile_arg" ]]; then
+    echo "ttmux: la session '$session' existe déjà ; profil et flags de setup ignorés." >&2
+  fi
+  attach_or_switch "$session"
+  exit 0
+fi
+
+# --- Création : résolution du profil ------------------------------------------
 profile_flags=()
 if [[ $no_profile -eq 0 ]]; then
   profile_path=""
@@ -221,31 +259,6 @@ fi
 all_flags=()
 [[ ${#profile_flags[@]} -gt 0 ]] && all_flags+=("${profile_flags[@]}")
 [[ ${#cli_flags[@]} -gt 0 ]] && all_flags+=("${cli_flags[@]}")
-
-# --- Routing ------------------------------------------------------------------
-if [[ -z "$session" ]]; then
-  if ! tmux ls >/dev/null 2>&1; then
-    tmux new-session -d -s "$DEFAULT_NAME"
-    [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$DEFAULT_NAME" "${all_flags[@]}"
-    attach_or_switch "$DEFAULT_NAME"
-    exit 0
-  fi
-  count=$(tmux ls 2>/dev/null | wc -l)
-  if [[ "$count" -eq 1 ]]; then
-    only=$(tmux ls -F '#{session_name}' | head -n1)
-    [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$only" "${all_flags[@]}"
-    attach_or_switch "$only"
-  else
-    tmux ls
-  fi
-  exit 0
-fi
-
-if session_exists "$session"; then
-  [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$session" "${all_flags[@]}"
-  attach_or_switch "$session"
-  exit 0
-fi
 
 tmux new-session -d -s "$session"
 [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$session" "${all_flags[@]}"

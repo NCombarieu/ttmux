@@ -36,14 +36,20 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 
 ## Installation
 
-### Depuis le RPM (Fedora / RHEL)
+Prérequis : `tmux` (résolu automatiquement par le RPM) et une distribution
+RPM-based (Fedora, RHEL, AlmaLinux, Rocky…).
+
+### Depuis le RPM publié sur GitHub Releases
+
+Récupérer le `.rpm` depuis [Releases](https://github.com/NCombarieu/ttmux/releases/latest)
+puis :
 
 ```sh
-sudo dnf install ./ttmux-1.1.0-1.fc44.noarch.rpm
+sudo dnf install ./ttmux-*.noarch.rpm
 ```
 
-Installe `/usr/bin/ttmux` et `/usr/share/man/man1/ttmux.1.gz`. La
-dépendance `tmux` est résolue automatiquement.
+Installe `/usr/bin/ttmux` (disponible pour tous les utilisateurs) et
+`/usr/share/man/man1/ttmux.1.gz`.
 
 ### Depuis les sources
 
@@ -54,27 +60,41 @@ make rpm                 # produit le RPM dans ~/rpmbuild/RPMS/noarch/
 sudo dnf install ~/rpmbuild/RPMS/noarch/ttmux-*.noarch.rpm
 ```
 
+Prérequis pour build : `rpm-build` et `rpmdevtools`
+(`sudo dnf install rpm-build rpmdevtools`).
+
 ### Sans RPM (autres distributions)
 
 ```sh
 sudo make install        # installe dans /usr/bin et /usr/share/man/man1
 ```
 
+### Désinstallation
+
+```sh
+sudo dnf remove ttmux               # si installé via RPM
+sudo rm /usr/bin/ttmux /usr/share/man/man1/ttmux.1*  # si installé via make install
+```
+
 ## Usage
+
+> Profil et flags de setup sont appliqués **uniquement à la création**
+> d'une session. Sur une session existante, `ttmux` attache simplement
+> (et émet un warning si des flags ou un `-p` explicite étaient passés).
 
 ### Sans nom de session
 
-| État de tmux | Comportement                                                  |
-|--------------|---------------------------------------------------------------|
-| 0 session    | crée la session `main` et l'attache (profil appliqué si présent) |
-| 1 session    | l'attache (profil appliqué si présent)                        |
-| 2+ sessions  | affiche la liste (`tmux ls`), pas de profil appliqué          |
+| État de tmux | Comportement                                              |
+|--------------|-----------------------------------------------------------|
+| 0 session    | crée `main` (profil appliqué si présent) puis attache     |
+| 1 session    | l'attache (warning si flags ignorés)                      |
+| 2+ sessions  | affiche la liste (`tmux ls`)                              |
 
 ### Avec un nom
 
 ```sh
 ttmux work       # attache 'work' si elle existe, sinon la crée
-                 # le profil ~/.ttmux/base est appliqué dans les deux cas
+                 # le profil ~/.ttmux/base est appliqué uniquement à la création
 ```
 
 ### Setup initial en CLI
