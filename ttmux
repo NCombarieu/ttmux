@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# ttmux — wrapper tmux pour attacher/lister/setup une session en une commande.
+set -euo pipefail
+
+DEFAULT_NAME="main"
+
+usage() {
+  cat <<'EOF'
+Usage: ttmux [<session>] [-c <cmd>] [-h] [-v] ...
+
+Sans argument :
+  - 0 session tmux → crée "main" et attache
+  - 1 session       → attache directement
+  - 2+ sessions     → liste les sessions
+
+Avec un nom :
+  - si la session existe : attache (les flags de setup sont ignorés)
+  - sinon                : crée la session, applique les flags dans l'ordre, attache
+
+Flags (ordre significatif, opèrent sur le pane courant) :
+  -c <cmd>   envoie <cmd> + Entrée dans le pane courant
+  -h         split horizontal (nouveau pane à droite), devient le pane courant
+  -v         split vertical   (nouveau pane en bas),  devient le pane courant
+  --help     affiche cette aide
+
+Exemple :
+  ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
+EOF
+}
+
+attach_or_switch() {
+  local name="$1"
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$name"
+  else
+    tmux attach-session -t "$name"
+  fi
+}
+
+session_exists() {
+  tmux has-session -t "=$1" 2>/dev/null
+}
+
+active_target() {
+  # session:window.pane du pane actif de la session donnée
+  tmux display-message -p -t "$1" '#{session_name}:#{window_index}.#{pane_index}'
+}
+
+# --- Aide ---------------------------------------------------------------------
+if [[ "${1:-}" == "--help" ]]; then
+  usage; exit 0
+fi
+
+# --- Sans argument ------------------------------------------------------------
+if [[ $# -eq 0 ]]; then
+  if ! tmux ls >/dev/null 2>&1; then
+    tmux new-session -d -s "$DEFAULT_NAME"
+    attach_or_switch "$DEFAULT_NAME"
+    exit 0
+  fi
+  count=$(tmux ls 2>/dev/null | wc -l)
+  if [[ "$count" -eq 1 ]]; then
+    only=$(tmux ls -F '#{session_name}' | head -n1)
+    attach_or_switch "$only"
+  else
+    tmux ls
+  fi
+  exit 0
+fi
+
+# --- Avec un nom de session ---------------------------------------------------
+session="$1"
+shift
+
+if session_exists "$session"; then
+  if [[ $# -gt 0 ]]; then
+    echo "ttmux: la session '$session' existe déjà ; flags de setup ignorés." >&2
+  fi
+  attach_or_switch "$session"
+  exit 0
+fi
+
+# Création détachée puis application des flags
+tmux new-session -d -s "$session"
+target=$(active_target "$session")
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c)
+      [[ $# -ge 2 ]] || { echo "ttmux: -c attend une commande" >&2; exit 1; }
+      tmux send-keys -t "$target" "$2" C-m
+      shift 2
+      ;;
+    -h)
+      tmux split-window -h -t "$target"
+      target=$(active_target "$session")
+      shift
+      ;;
+    -v)
+      tmux split-window -v -t "$target"
+      target=$(active_target "$session")
+      shift
+      ;;
+    --help)
+      usage; exit 0
+      ;;
+    *)
+      echo "ttmux: flag inconnu : $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+attach_or_switch "$session"

@@ -1,0 +1,108 @@
+.TH TTMUX 1 "2026-05-09" "ttmux 1.0.0" "User Commands"
+.SH NAME
+ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un setup
+.SH SYNOPSIS
+.B ttmux
+.RI [ session ]
+.RI [ "\-c " cmd ]
+.RB [ \-h ]
+.RB [ \-v ]
+.IR ...
+.br
+.B ttmux \-\-help
+.SH DESCRIPTION
+.B ttmux
+est un wrapper autour de
+.BR tmux (1)
+qui simplifie les opérations courantes : attacher à une session existante, en
+créer une nouvelle, ou lister les sessions disponibles. Il permet aussi de
+décrire en ligne de commande la disposition initiale (splits) et les
+commandes à envoyer dans chaque pane d'une nouvelle session.
+.PP
+Si
+.B ttmux
+est appelé sans argument :
+.IP \(bu 2
+si aucune session tmux n'existe, une session nommée
+.B main
+est créée puis attachée ;
+.IP \(bu 2
+si une seule session existe, elle est attachée directement ;
+.IP \(bu 2
+si plusieurs sessions existent, la liste est affichée
+(équivalent de \fBtmux ls\fR).
+.PP
+Si un nom de session est fourni :
+.IP \(bu 2
+si la session existe déjà, elle est attachée et les flags de setup
+éventuels sont ignorés (avec un avertissement) ;
+.IP \(bu 2
+sinon, la session est créée puis les flags sont appliqués dans l'ordre
+sur le pane courant, et la session est attachée.
+.PP
+Lorsque
+.B ttmux
+est appelé depuis l'intérieur de tmux, il utilise
+.B switch-client
+au lieu de
+.B attach-session
+pour basculer vers la session cible.
+.SH OPTIONS
+.TP
+.BI \-c " cmd"
+Envoie
+.I cmd
+suivi de la touche Entrée dans le pane courant.
+.TP
+.B \-h
+Effectue un split horizontal (nouveau pane à droite). Le nouveau pane
+devient le pane courant pour les flags suivants.
+.TP
+.B \-v
+Effectue un split vertical (nouveau pane en bas). Le nouveau pane
+devient le pane courant pour les flags suivants.
+.TP
+.B \-\-help
+Affiche l'aide en ligne et quitte.
+.SH EXAMPLES
+Attacher la seule session existante, ou créer
+.B main
+si aucune n'existe :
+.PP
+.RS
+.nf
+ttmux
+.fi
+.RE
+.PP
+Attacher la session
+.B work
+si elle existe, sinon la créer (vide) :
+.PP
+.RS
+.nf
+ttmux work
+.fi
+.RE
+.PP
+Créer une session
+.B dev
+avec un éditeur à gauche, un SSH en haut à droite, htop en bas à droite :
+.PP
+.RS
+.nf
+ttmux dev \-c 'cd ~/proj && nvim' \-h \-c 'ssh prod\-host' \-v \-c 'htop'
+.fi
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Succès.
+.TP
+.B 1
+Erreur d'usage (flag inconnu, argument manquant pour
+.BR \-c ).
+.SH SEE ALSO
+.BR tmux (1)
+.SH AUTHOR
+Noel Combarieu.
