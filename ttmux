@@ -1,33 +1,52 @@
 #!/usr/bin/env bash
-# ttmux — wrapper tmux pour attacher/lister/setup une session en une commande.
+# ttmux — wrapper tmux pour attacher/lister/setup une session avec profils.
 set -euo pipefail
 
 DEFAULT_NAME="main"
+PROFILE_DIR="$HOME/.ttmux"
+DEFAULT_PROFILE="base"
 
 usage() {
   cat <<'EOF'
-Usage: ttmux [<session>] [-c <cmd>] [-h] [-v] ...
+Usage: ttmux [<session>] [-p <nom|chemin>] [-N] [-c <cmd>] [-h] [-v] ...
 
 Sans argument :
-  - 0 session tmux → crée "main" et attache
-  - 1 session       → attache directement
-  - 2+ sessions     → liste les sessions
+  - 0 session tmux → crée "main" et l'attache (profil appliqué si présent)
+  - 1 session      → attache (profil appliqué si présent)
+  - 2+ sessions    → liste (pas de profil appliqué)
 
 Avec un nom :
-  - si la session existe : attache (les flags de setup sont ignorés)
-  - sinon                : crée la session, applique les flags dans l'ordre, attache
+  - existante : attache puis applique profil + flags CLI sur le pane actif
+  - nouvelle  : crée la session, applique profil + flags CLI puis attache
 
-Flags (ordre significatif, opèrent sur le pane courant) :
-  -c <cmd>   envoie <cmd> + Entrée dans le pane courant
-  -h         split horizontal (nouveau pane à droite), devient le pane courant
-  -v         split vertical   (nouveau pane en bas),  devient le pane courant
-  --help     affiche cette aide
+Profil :
+  Par défaut, si ~/.ttmux/base existe, son contenu est appliqué AVANT les
+  flags de la ligne de commande. Format : mêmes flags que la CLI, un ou
+  plusieurs par ligne ; lignes vides et lignes # ignorées. Directive
+  "include <nom|chemin>" pour composer plusieurs fichiers (cycles ignorés).
 
-Exemple :
+Flags :
+  -p <nom|chemin>  charge ~/.ttmux/<nom> (ou le chemin) au lieu de "base"
+  -N               ne charge AUCUN profil (override le "base" par défaut)
+  -c <cmd>         envoie <cmd> + Entrée dans le pane courant
+  -h               split horizontal (nouveau pane à droite, devient courant)
+  -v               split vertical   (nouveau pane en bas,  devient courant)
+  --help           affiche cette aide
+
+Exemples :
+  ttmux dev
+  ttmux dev -p cnetcv
+  ttmux dev -N
   ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
+
+Exemple ~/.ttmux/base :
+  include common
+  -c 'cd ~/proj && nvim'
+  -h -c 'ssh prod-host'
 EOF
 }
 
+# --- Helpers tmux -------------------------------------------------------------
 attach_or_switch() {
   local name="$1"
   if [[ -n "${TMUX:-}" ]]; then
@@ -42,25 +61,179 @@ session_exists() {
 }
 
 active_target() {
-  # session:window.pane du pane actif de la session donnée
   tmux display-message -p -t "$1" '#{session_name}:#{window_index}.#{pane_index}'
 }
 
-# --- Aide ---------------------------------------------------------------------
-if [[ "${1:-}" == "--help" ]]; then
-  usage; exit 0
+# --- Profil -------------------------------------------------------------------
+declare -A _ttmux_visited=()
+
+# Imprime sur stdout les lignes "utiles" du profil, includes expansés.
+expand_profile() {
+  local file="$1"
+  local abs
+  abs=$(realpath -m -- "$file")
+  if [[ -n "${_ttmux_visited[$abs]:-}" ]]; then
+    return 0
+  fi
+  _ttmux_visited[$abs]=1
+  if [[ ! -r "$abs" ]]; then
+    echo "ttmux: profil introuvable : $file" >&2
+    return 1
+  fi
+  local line target target_path
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    if [[ "$line" =~ ^include[[:space:]]+(.+)$ ]]; then
+      target="${BASH_REMATCH[1]}"
+      target="${target#\"}"; target="${target%\"}"
+      target="${target#\'}"; target="${target%\'}"
+      if [[ "$target" == /* ]]; then
+        target_path="$target"
+      elif [[ "$target" == ./* || "$target" == ../* || "$target" == */* ]]; then
+        target_path="$(dirname -- "$abs")/$target"
+      elif [[ -f "$PROFILE_DIR/$target" ]]; then
+        target_path="$PROFILE_DIR/$target"
+      else
+        target_path="$(dirname -- "$abs")/$target"
+      fi
+      expand_profile "$target_path" || return $?
+    else
+      printf '%s\n' "$line"
+    fi
+  done < "$abs"
+}
+
+# Charge un profil dans un tableau de flags (passé par nom de variable).
+load_profile() {
+  local path="$1"
+  local -n out_array="$2"
+  _ttmux_visited=()
+  local line
+  while IFS= read -r line; do
+    eval "out_array+=( $line )"
+  done < <(expand_profile "$path")
+}
+
+# --- Application des flags sur une session ------------------------------------
+apply_flags() {
+  local session="$1"; shift
+  local target
+  target=$(active_target "$session")
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -c)
+        [[ $# -ge 2 ]] || { echo "ttmux: -c attend une commande" >&2; exit 1; }
+        tmux send-keys -t "$target" "$2" C-m
+        shift 2
+        ;;
+      -h)
+        tmux split-window -h -t "$target"
+        target=$(active_target "$session")
+        shift
+        ;;
+      -v)
+        tmux split-window -v -t "$target"
+        target=$(active_target "$session")
+        shift
+        ;;
+      *)
+        echo "ttmux: flag de setup inconnu : $1" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# --- Parse CLI ----------------------------------------------------------------
+session=""
+profile_arg=""
+no_profile=0
+cli_flags=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help)
+      usage; exit 0
+      ;;
+    -N|--no-config)
+      no_profile=1
+      shift
+      ;;
+    -p|--profile)
+      [[ $# -ge 2 ]] || { echo "ttmux: -p attend un nom ou un chemin" >&2; exit 1; }
+      profile_arg="$2"
+      shift 2
+      ;;
+    -c)
+      [[ $# -ge 2 ]] || { echo "ttmux: -c attend une commande" >&2; exit 1; }
+      cli_flags+=("-c" "$2")
+      shift 2
+      ;;
+    -h|-v)
+      cli_flags+=("$1")
+      shift
+      ;;
+    --)
+      shift
+      ;;
+    -*)
+      echo "ttmux: flag inconnu : $1" >&2
+      usage >&2
+      exit 1
+      ;;
+    *)
+      if [[ -z "$session" ]]; then
+        session="$1"
+        shift
+      else
+        echo "ttmux: argument positionnel inattendu : $1" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+# --- Résolution du profil -----------------------------------------------------
+profile_flags=()
+if [[ $no_profile -eq 0 ]]; then
+  profile_path=""
+  if [[ -n "$profile_arg" ]]; then
+    if [[ "$profile_arg" == /* || "$profile_arg" == ./* || "$profile_arg" == ../* || "$profile_arg" == */* ]]; then
+      profile_path="$profile_arg"
+    else
+      profile_path="$PROFILE_DIR/$profile_arg"
+    fi
+    if [[ ! -f "$profile_path" ]]; then
+      echo "ttmux: profil introuvable : $profile_path" >&2
+      exit 1
+    fi
+  elif [[ -f "$PROFILE_DIR/$DEFAULT_PROFILE" ]]; then
+    profile_path="$PROFILE_DIR/$DEFAULT_PROFILE"
+  fi
+  if [[ -n "$profile_path" ]]; then
+    load_profile "$profile_path" profile_flags
+  fi
 fi
 
-# --- Sans argument ------------------------------------------------------------
-if [[ $# -eq 0 ]]; then
+# Combinaison : profil d'abord, puis CLI
+all_flags=()
+[[ ${#profile_flags[@]} -gt 0 ]] && all_flags+=("${profile_flags[@]}")
+[[ ${#cli_flags[@]} -gt 0 ]] && all_flags+=("${cli_flags[@]}")
+
+# --- Routing ------------------------------------------------------------------
+if [[ -z "$session" ]]; then
   if ! tmux ls >/dev/null 2>&1; then
     tmux new-session -d -s "$DEFAULT_NAME"
+    [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$DEFAULT_NAME" "${all_flags[@]}"
     attach_or_switch "$DEFAULT_NAME"
     exit 0
   fi
   count=$(tmux ls 2>/dev/null | wc -l)
   if [[ "$count" -eq 1 ]]; then
     only=$(tmux ls -F '#{session_name}' | head -n1)
+    [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$only" "${all_flags[@]}"
     attach_or_switch "$only"
   else
     tmux ls
@@ -68,48 +241,12 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
-# --- Avec un nom de session ---------------------------------------------------
-session="$1"
-shift
-
 if session_exists "$session"; then
-  if [[ $# -gt 0 ]]; then
-    echo "ttmux: la session '$session' existe déjà ; flags de setup ignorés." >&2
-  fi
+  [[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$session" "${all_flags[@]}"
   attach_or_switch "$session"
   exit 0
 fi
 
-# Création détachée puis application des flags
 tmux new-session -d -s "$session"
-target=$(active_target "$session")
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -c)
-      [[ $# -ge 2 ]] || { echo "ttmux: -c attend une commande" >&2; exit 1; }
-      tmux send-keys -t "$target" "$2" C-m
-      shift 2
-      ;;
-    -h)
-      tmux split-window -h -t "$target"
-      target=$(active_target "$session")
-      shift
-      ;;
-    -v)
-      tmux split-window -v -t "$target"
-      target=$(active_target "$session")
-      shift
-      ;;
-    --help)
-      usage; exit 0
-      ;;
-    *)
-      echo "ttmux: flag inconnu : $1" >&2
-      usage >&2
-      exit 1
-      ;;
-  esac
-done
-
+[[ ${#all_flags[@]} -gt 0 ]] && apply_flags "$session" "${all_flags[@]}"
 attach_or_switch "$session"

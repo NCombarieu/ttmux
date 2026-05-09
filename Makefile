@@ -1,5 +1,5 @@
 NAME     := ttmux
-VERSION  := 1.0.0
+VERSION  := 1.1.0
 RPMBUILD ?= $(HOME)/rpmbuild
 
 .PHONY: all tarball rpm install clean distclean

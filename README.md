@@ -5,8 +5,8 @@
 [![Platform: Fedora](https://img.shields.io/badge/platform-Fedora-294172.svg)](#installation)
 
 Wrapper [tmux](https://github.com/tmux/tmux) pour attacher, lister ou créer
-une session avec un setup (splits + commandes) en une seule ligne de
-commande.
+une session avec un setup (splits + commandes), en CLI ou via un fichier
+de profil.
 
 ```sh
 ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
@@ -17,6 +17,7 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 - [Pourquoi](#pourquoi)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Profils](#profils)
 - [Construction du RPM](#construction-du-rpm)
 - [Licence](#licence)
 
@@ -28,16 +29,17 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 - créer une session nommée si elle n'existe pas, l'attacher sinon
 - décrire d'un coup une layout (splits) et la commande à lancer dans
   chaque pane
+- factoriser des layouts récurrents dans des profils réutilisables
 
-`ttmux` enveloppe ces trois cas dans une seule commande, sans
-remplacer `tmux` (auquel il délègue tout).
+`ttmux` enveloppe ces cas dans une seule commande, sans remplacer `tmux`
+(auquel il délègue tout).
 
 ## Installation
 
 ### Depuis le RPM (Fedora / RHEL)
 
 ```sh
-sudo dnf install ./ttmux-1.0.0-1.fc44.noarch.rpm
+sudo dnf install ./ttmux-1.1.0-1.fc44.noarch.rpm
 ```
 
 Installe `/usr/bin/ttmux` et `/usr/share/man/man1/ttmux.1.gz`. La
@@ -60,45 +62,95 @@ sudo make install        # installe dans /usr/bin et /usr/share/man/man1
 
 ## Usage
 
-### Sans argument
+### Sans nom de session
 
-| État de tmux | Comportement                              |
-|--------------|-------------------------------------------|
-| 0 session    | crée la session `main` et l'attache       |
-| 1 session    | l'attache directement                     |
-| 2+ sessions  | affiche la liste (équivalent `tmux ls`)   |
+| État de tmux | Comportement                                                  |
+|--------------|---------------------------------------------------------------|
+| 0 session    | crée la session `main` et l'attache (profil appliqué si présent) |
+| 1 session    | l'attache (profil appliqué si présent)                        |
+| 2+ sessions  | affiche la liste (`tmux ls`), pas de profil appliqué          |
 
 ### Avec un nom
 
 ```sh
-ttmux work       # attache 'work' si elle existe, sinon la crée vide
+ttmux work       # attache 'work' si elle existe, sinon la crée
+                 # le profil ~/.ttmux/base est appliqué dans les deux cas
 ```
 
-### Avec un setup initial
+### Setup initial en CLI
 
 Les flags sont appliqués **dans l'ordre** sur le pane courant. Un split
 rend le nouveau pane actif pour les flags suivants.
 
-| Flag        | Effet                                                    |
-|-------------|----------------------------------------------------------|
-| `-c <cmd>`  | envoie `<cmd>` + Entrée dans le pane courant             |
-| `-h`        | split horizontal (nouveau pane à droite, devient actif)  |
-| `-v`        | split vertical (nouveau pane en bas, devient actif)      |
+| Flag             | Effet                                                    |
+|------------------|----------------------------------------------------------|
+| `-c <cmd>`       | envoie `<cmd>` + Entrée dans le pane courant             |
+| `-h`             | split horizontal (nouveau pane à droite, devient actif)  |
+| `-v`             | split vertical (nouveau pane en bas, devient actif)      |
+| `-p <nom\|chemin>` | charge un profil au lieu de `base`                     |
+| `-N`             | désactive le chargement du profil par défaut             |
 
 Exemple — éditeur à gauche, SSH en haut à droite, `htop` en bas à droite :
 
 ```sh
-ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
+ttmux dev -N -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 ```
 
-Si la session `dev` existe déjà, les flags sont ignorés (avec un
-avertissement) et la session est simplement attachée.
+L'ordre d'application est toujours **profil d'abord, CLI ensuite**.
 
 ### Aide
 
 ```sh
 ttmux --help     # aide en ligne
 man ttmux        # page de manuel complète (après install RPM)
+```
+
+## Profils
+
+Les profils vivent dans `~/.ttmux/`. Un fichier de profil contient les
+mêmes flags que la CLI, un ou plusieurs par ligne. Les lignes vides et
+celles commençant par `#` sont ignorées.
+
+`~/.ttmux/base` est chargé automatiquement à chaque appel (sauf `-N`).
+N'importe quel autre nom est chargé via `-p <nom>` (ou `-p <chemin>`
+pour pointer ailleurs que dans `~/.ttmux/`).
+
+### Exemple
+
+`~/.ttmux/common` :
+
+```
+-c 'cd ~/proj'
+```
+
+`~/.ttmux/base` :
+
+```
+include common
+-c 'nvim'
+-h -c 'ssh prod-host'
+-v -c 'htop'
+```
+
+### Directive `include`
+
+`include <nom|chemin>` inclut récursivement un autre profil :
+
+| Forme                | Résolution                                          |
+|----------------------|-----------------------------------------------------|
+| `/abs/path`          | utilisé tel quel                                    |
+| `./foo`, `../foo`, `dir/foo` | relatif au fichier courant                |
+| `nom` (sans `/`)     | `~/.ttmux/<nom>` si présent, sinon relatif au fichier courant |
+
+Les inclusions cycliques sont détectées et ignorées (chaque fichier est
+parcouru au plus une fois par invocation).
+
+### Choix d'un profil alternatif
+
+```sh
+ttmux dev -p cnetcv          # charge ~/.ttmux/cnetcv
+ttmux dev -p ./foo.conf      # charge un chemin
+ttmux dev -N                 # ne charge AUCUN profil
 ```
 
 ## Construction du RPM

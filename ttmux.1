@@ -1,9 +1,12 @@
-.TH TTMUX 1 "2026-05-09" "ttmux 1.0.0" "User Commands"
+.TH TTMUX 1 "2026-05-09" "ttmux 1.1.0" "User Commands"
 .SH NAME
-ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un setup
+ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
 .B ttmux
 .RI [ session ]
+.RB [ \-p
+.IR nom | chemin ]
+.RB [ \-N ]
 .RI [ "\-c " cmd ]
 .RB [ \-h ]
 .RB [ \-v ]
@@ -14,40 +17,100 @@ ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un setup
 .B ttmux
 est un wrapper autour de
 .BR tmux (1)
-qui simplifie les opérations courantes : attacher à une session existante, en
-créer une nouvelle, ou lister les sessions disponibles. Il permet aussi de
-décrire en ligne de commande la disposition initiale (splits) et les
-commandes à envoyer dans chaque pane d'une nouvelle session.
+qui simplifie l'attache, la création et le setup d'une session. Il peut
+charger un fichier de
+.I profil
+(par défaut
+.IR ~/.ttmux/base )
+et appliquer une suite de splits et de commandes décrits soit dans le
+profil, soit en ligne de commande, soit les deux.
 .PP
 Si
 .B ttmux
-est appelé sans argument :
+est appelé sans nom de session :
 .IP \(bu 2
 si aucune session tmux n'existe, une session nommée
 .B main
-est créée puis attachée ;
+est créée puis attachée (profil appliqué si présent) ;
 .IP \(bu 2
-si une seule session existe, elle est attachée directement ;
+si une seule session existe, elle est attachée (profil appliqué si présent) ;
 .IP \(bu 2
 si plusieurs sessions existent, la liste est affichée
-(équivalent de \fBtmux ls\fR).
+(\fItmux ls\fR) sans appliquer de profil.
 .PP
 Si un nom de session est fourni :
 .IP \(bu 2
-si la session existe déjà, elle est attachée et les flags de setup
-éventuels sont ignorés (avec un avertissement) ;
+si la session existe : elle est attachée et le profil + les flags CLI
+sont appliqués sur le pane actif ;
 .IP \(bu 2
-sinon, la session est créée puis les flags sont appliqués dans l'ordre
-sur le pane courant, et la session est attachée.
+sinon : la session est créée, le profil + les flags CLI sont appliqués,
+puis la session est attachée.
 .PP
+L'ordre est toujours :
+.B profil d'abord, ligne de commande ensuite.
 Lorsque
 .B ttmux
-est appelé depuis l'intérieur de tmux, il utilise
+est appelé depuis l'intérieur de tmux,
 .B switch-client
-au lieu de
-.B attach-session
-pour basculer vers la session cible.
+est utilisé à la place de
+.BR attach-session .
+.SH PROFILS
+Le répertoire
+.I ~/.ttmux
+contient des fichiers de profil. Chaque ligne reproduit la syntaxe des
+flags de la ligne de commande (un ou plusieurs flags par ligne). Les
+lignes vides et celles commençant par
+.B #
+sont ignorées.
+.PP
+La directive
+.BI "include " "<nom|chemin>"
+inclut récursivement un autre profil. La résolution :
+.IP \(bu 2
+chemin absolu
+.RB ( / ...) :
+utilisé tel quel ;
+.IP \(bu 2
+chemin relatif
+.RB ( ./ ", " ../ )
+ou contenant un
+.B /
+: relatif au fichier courant ;
+.IP \(bu 2
+nom simple :
+.IB ~/.ttmux/ <nom>
+si présent, sinon relatif au fichier courant.
+.PP
+Les inclusions cycliques sont détectées et ignorées (chaque fichier est
+parcouru au plus une fois par invocation).
+.PP
+Exemple
+.IR ~/.ttmux/base " :"
+.PP
+.RS
+.nf
+include common
+\-c 'cd ~/proj && nvim'
+\-h \-c 'ssh prod\-host'
+.fi
+.RE
 .SH OPTIONS
+.TP
+.BI \-p " nom\fR|\fIchemin"
+Charge le profil donné au lieu du
+.B base
+par défaut. Si l'argument contient un
+.B /
+ou commence par
+.BR ./ / ../ /
+.BR / ,
+il est traité comme un chemin ; sinon il est cherché dans
+.IR ~/.ttmux/ .
+Échec si le fichier n'existe pas.
+.TP
+.B \-N
+Ne charge aucun profil (annule le chargement automatique de
+.IR ~/.ttmux/base ).
 .TP
 .BI \-c " cmd"
 Envoie
@@ -64,10 +127,19 @@ devient le pane courant pour les flags suivants.
 .TP
 .B \-\-help
 Affiche l'aide en ligne et quitte.
+.SH FICHIERS
+.TP
+.I ~/.ttmux/
+Répertoire des profils utilisateur.
+.TP
+.I ~/.ttmux/base
+Profil chargé par défaut s'il existe.
 .SH EXAMPLES
-Attacher la seule session existante, ou créer
+Attacher la seule session existante (ou créer
 .B main
-si aucune n'existe :
+si aucune n'existe), en appliquant
+.I ~/.ttmux/base
+si présent :
 .PP
 .RS
 .nf
@@ -75,23 +147,22 @@ ttmux
 .fi
 .RE
 .PP
-Attacher la session
-.B work
-si elle existe, sinon la créer (vide) :
+Créer une session
+.B dev
+avec le profil
+.IR ~/.ttmux/cnetcv " :"
 .PP
 .RS
 .nf
-ttmux work
+ttmux dev \-p cnetcv
 .fi
 .RE
 .PP
-Créer une session
-.B dev
-avec un éditeur à gauche, un SSH en haut à droite, htop en bas à droite :
+Créer une session sans aucun profil, layout entièrement en CLI :
 .PP
 .RS
 .nf
-ttmux dev \-c 'cd ~/proj && nvim' \-h \-c 'ssh prod\-host' \-v \-c 'htop'
+ttmux dev \-N \-c 'cd ~/proj && nvim' \-h \-c 'ssh prod' \-v \-c 'htop'
 .fi
 .RE
 .SH EXIT STATUS
@@ -100,8 +171,9 @@ ttmux dev \-c 'cd ~/proj && nvim' \-h \-c 'ssh prod\-host' \-v \-c 'htop'
 Succès.
 .TP
 .B 1
-Erreur d'usage (flag inconnu, argument manquant pour
-.BR \-c ).
+Erreur d'usage : flag inconnu, argument manquant pour
+.BR \-c " ou " \-p ,
+profil introuvable, argument positionnel inattendu.
 .SH SEE ALSO
 .BR tmux (1)
 .SH AUTHOR
