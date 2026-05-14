@@ -39,6 +39,16 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 Prérequis : `tmux` (résolu automatiquement par le RPM) et une distribution
 RPM-based (Fedora, RHEL, AlmaLinux, Rocky…).
 
+### Via le dépôt DNF (recommandé — permet `dnf update`)
+
+```sh
+sudo curl -o /etc/yum.repos.d/ttmux.repo \
+  https://ncombarieu.github.io/ttmux/ttmux.repo
+sudo dnf install ttmux
+```
+
+Les mises à jour sont ensuite disponibles via `dnf update ttmux`.
+
 ### Depuis le RPM publié sur GitHub Releases
 
 Récupérer le `.rpm` depuis [Releases](https://github.com/NCombarieu/ttmux/releases/latest)
@@ -72,8 +82,10 @@ sudo make install        # installe dans /usr/bin et /usr/share/man/man1
 ### Désinstallation
 
 ```sh
-sudo dnf remove ttmux               # si installé via RPM
+sudo dnf remove ttmux               # si installé via RPM ou dépôt
 sudo rm /usr/bin/ttmux /usr/share/man/man1/ttmux.1*  # si installé via make install
+# Supprimer aussi le dépôt si ajouté :
+sudo rm /etc/yum.repos.d/ttmux.repo
 ```
 
 ## Usage
