@@ -1,4 +1,4 @@
-.TH TTMUX 1 "2026-05-09" "ttmux 1.2.0" "User Commands"
+.TH TTMUX 1 "2026-05-14" "ttmux 1.3.0" "User Commands"
 .SH NAME
 ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
@@ -13,6 +13,12 @@ ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .IR ...
 .br
 .B ttmux \-\-help
+.br
+.B ttmux list
+|
+.B \-l
+|
+.B \-\-list
 .SH DESCRIPTION
 .B ttmux
 est un wrapper autour de
@@ -130,6 +136,14 @@ devient le pane courant pour les flags suivants.
 .B \-v
 Effectue un split vertical (nouveau pane en bas). Le nouveau pane
 devient le pane courant pour les flags suivants.
+.TP
+.BR \-l ", " \-\-list ", " list
+Liste les sessions tmux existantes (délègue à
+.BR "tmux ls" )
+puis quitte. La forme
+.B list
+n'est reconnue qu'en première position. Mode exclusif : tout autre
+argument est ignoré avec un avertissement.
 .TP
 .B \-\-help
 Affiche l'aide en ligne et quitte.

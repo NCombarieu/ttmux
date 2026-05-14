@@ -90,6 +90,16 @@ sudo rm /usr/bin/ttmux /usr/share/man/man1/ttmux.1*  # si installé via make ins
 | 1 session    | l'attache (warning si flags ignorés)                      |
 | 2+ sessions  | affiche la liste (`tmux ls`)                              |
 
+### Lister les sessions
+
+```sh
+ttmux list      # ou : ttmux -l, ttmux --list
+```
+
+Délègue à `tmux ls` et termine. Utile pour forcer l'affichage de la
+liste même quand 0 ou 1 session existe (cas où un `ttmux` nu attacherait
+ou créerait à la place).
+
 ### Avec un nom
 
 ```sh
@@ -109,6 +119,7 @@ rend le nouveau pane actif pour les flags suivants.
 | `-v`             | split vertical (nouveau pane en bas, devient actif)      |
 | `-p <nom\|chemin>` | charge un profil au lieu de `base`                     |
 | `-N`             | désactive le chargement du profil par défaut             |
+| `-l`, `--list`   | liste les sessions tmux (équivalent : `ttmux list`)      |
 
 Exemple — éditeur à gauche, SSH en haut à droite, `htop` en bas à droite :
 

@@ -9,6 +9,7 @@ DEFAULT_PROFILE="base"
 usage() {
   cat <<'EOF'
 Usage: ttmux [<session>] [-p <nom|chemin>] [-N] [-c <cmd>] [-h] [-v] ...
+       ttmux list | -l | --list
 
 Profil et flags de setup ne sont appliqués QU'À LA CRÉATION d'une
 session. Sur une session existante, attache simple ; warning si des
@@ -35,6 +36,7 @@ Flags :
   -c <cmd>         envoie <cmd> + Entrée dans le pane courant
   -h               split horizontal (nouveau pane à droite, devient courant)
   -v               split vertical   (nouveau pane en bas,  devient courant)
+  -l, --list       liste les sessions tmux existantes (équivalent: ttmux list)
   --help           affiche cette aide
 
 Exemples :
@@ -154,12 +156,23 @@ apply_flags() {
 session=""
 profile_arg=""
 no_profile=0
+list_mode=0
 cli_flags=()
+
+# Sous-commande "list" : reconnue uniquement comme premier argument.
+if [[ $# -gt 0 && "$1" == "list" ]]; then
+  list_mode=1
+  shift
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help)
       usage; exit 0
+      ;;
+    -l|--list)
+      list_mode=1
+      shift
       ;;
     -N|--no-config)
       no_profile=1
@@ -198,6 +211,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# --- Mode list : délègue à `tmux ls` ------------------------------------------
+if [[ $list_mode -eq 1 ]]; then
+  if [[ -n "$session" || ${#cli_flags[@]} -gt 0 || -n "$profile_arg" || $no_profile -eq 1 ]]; then
+    echo "ttmux: --list est exclusif ; autres arguments ignorés." >&2
+  fi
+  exec tmux ls
+fi
 
 # --- Routing : décider d'attacher ou de créer ---------------------------------
 # On ne charge le profil et n'applique les flags QUE lors d'une création.
