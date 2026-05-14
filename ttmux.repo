@@ -1,0 +1,5 @@
+[ttmux]
+name=ttmux
+baseurl=https://ncombarieu.github.io/ttmux/repo
+enabled=1
+gpgcheck=0
