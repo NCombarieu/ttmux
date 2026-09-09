@@ -10,45 +10,92 @@ usage() {
   cat <<'EOF'
 Usage: ttmux [<session>] [-p <nom|chemin>] [-N] [-c <cmd>] [-h] [-v] ...
        ttmux list | -l | --list
+       ttmux --help
 
-Profil et flags de setup ne sont appliqués QU'À LA CRÉATION d'une
-session. Sur une session existante, attache simple ; warning si des
-flags ou un -p explicite étaient passés (ils sont ignorés).
+Wrapper tmux : attache, crée ou liste une session, et applique un layout
+(splits + commandes) décrit en ligne de commande et/ou dans un profil.
 
-Sans argument :
-  - 0 session tmux → crée "main" (profil appliqué) puis attache
-  - 1 session      → attache (warning si flags ignorés)
-  - 2+ sessions    → liste
+ROUTAGE
+  ttmux              0 session tmux  → crée "main" (profil appliqué) puis attache
+                     1 session       → l'attache
+                     2+ sessions     → affiche la liste
+  ttmux <session>    existante       → attache
+                     nouvelle        → crée, applique profil + flags, attache
 
-Avec un nom :
-  - existante : attache (warning si flags ignorés)
-  - nouvelle  : crée la session, applique profil + flags CLI, attache
+  Profil et flags de setup ne sont appliqués QU'À LA CRÉATION. Sur une
+  session existante, ttmux attache et prévient que les flags sont ignorés.
+  Appelé depuis tmux, switch-client remplace attach-session.
 
-Profil :
-  Par défaut, si ~/.ttmux/base existe, son contenu est appliqué AVANT les
-  flags de la ligne de commande. Format : mêmes flags que la CLI, un ou
-  plusieurs par ligne ; lignes vides et lignes # ignorées. Directive
-  "include <nom|chemin>" pour composer plusieurs fichiers (cycles ignorés).
+FLAGS
+  -c <cmd>                    envoie <cmd> + Entrée dans le pane courant
+  -h                          split horizontal (pane à droite, devient courant)
+  -v                          split vertical   (pane en bas,   devient courant)
+  -p, --profile <nom|chemin>  charge ~/.ttmux/<nom> (ou le chemin) au lieu de "base"
+  -N, --no-config             ne charge AUCUN profil (override le "base" par défaut)
+  -l, --list                  liste les sessions tmux (équivalent : ttmux list)
+  --help                      affiche cette aide
 
-Flags :
-  -p <nom|chemin>  charge ~/.ttmux/<nom> (ou le chemin) au lieu de "base"
-  -N               ne charge AUCUN profil (override le "base" par défaut)
-  -c <cmd>         envoie <cmd> + Entrée dans le pane courant
-  -h               split horizontal (nouveau pane à droite, devient courant)
-  -v               split vertical   (nouveau pane en bas,  devient courant)
-  -l, --list       liste les sessions tmux existantes (équivalent: ttmux list)
-  --help           affiche cette aide
+  Les flags de layout sont appliqués DANS L'ORDRE sur le pane courant ; un
+  split rend le nouveau pane courant pour les flags suivants. Ordre global :
+  profil d'abord, ligne de commande ensuite.
 
-Exemples :
-  ttmux dev
+PROFILS
+  ~/.ttmux/base est chargé automatiquement s'il existe (sauf avec -N).
+  Format : mêmes flags que la CLI, un ou plusieurs par ligne ; lignes vides
+  et lignes commençant par # ignorées.
+
+  Directive "include <nom|chemin>" pour composer plusieurs fichiers :
+    /abs/path              utilisé tel quel
+    ./f  ../f  dir/f       relatif au fichier courant
+    nom                    ~/.ttmux/nom si présent, sinon relatif au fichier
+  Les inclusions cycliques sont détectées et ignorées.
+
+EXEMPLES
+  # Attacher l'unique session (ou créer "main" s'il n'y en a aucune)
+  ttmux
+
+  # Lister les sessions, même s'il y en a 0 ou 1
+  ttmux list
+  ttmux -l
+
+  # Attacher "work" si elle existe, sinon la créer avec ~/.ttmux/base
+  ttmux work
+
+  # Créer "dev" avec le profil ~/.ttmux/cnetcv
   ttmux dev -p cnetcv
-  ttmux dev -N
-  ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 
-Exemple ~/.ttmux/base :
+  # Créer "dev" avec un profil situé hors de ~/.ttmux
+  ttmux dev -p ./layouts/dev.conf
+
+  # Créer "dev" sans charger aucun profil
+  ttmux dev -N
+
+  # Une commande dans le pane initial
+  ttmux dev -c 'cd ~/proj && nvim'
+
+  # Éditeur à gauche, ssh en haut à droite, htop en bas à droite
+  ttmux dev -N -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
+
+  # Trois panes empilés
+  ttmux logs -N -c 'tail -f /var/log/messages' -v -c 'journalctl -f' -v -c 'htop'
+
+  # Profil puis ajouts CLI (le profil est appliqué en premier)
+  ttmux dev -p cnetcv -v -c 'htop'
+
+EXEMPLE ~/.ttmux/base
   include common
   -c 'cd ~/proj && nvim'
   -h -c 'ssh prod-host'
+  -v -c 'htop'
+
+COMPLÉTION
+  Le paquet installe la complétion bash et zsh : sessions existantes,
+  profils de ~/.ttmux, flags, et commandes pour -c. Pour l'activer dans le
+  shell courant sans réouvrir un terminal :
+    source /usr/share/bash-completion/completions/ttmux
+
+VOIR AUSSI
+  man ttmux, tmux(1)
 EOF
 }
 

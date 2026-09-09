@@ -1,4 +1,4 @@
-.TH TTMUX 1 "2026-05-14" "ttmux 1.3.0" "User Commands"
+.TH TTMUX 1 "2026-09-09" "ttmux 1.4.0" "User Commands"
 .SH NAME
 ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
@@ -108,7 +108,7 @@ include common
 .RE
 .SH OPTIONS
 .TP
-.BI \-p " nom\fR|\fIchemin"
+.BR \-p ", " \-\-profile " " \fInom\fR|\fIchemin\fR
 Charge le profil donné au lieu du
 .B base
 par défaut. Si l'argument contient un
@@ -120,7 +120,7 @@ il est traité comme un chemin ; sinon il est cherché dans
 .IR ~/.ttmux/ .
 Échec si le fichier n'existe pas.
 .TP
-.B \-N
+.BR \-N ", " \-\-no\-config
 Ne charge aucun profil (annule le chargement automatique de
 .IR ~/.ttmux/base ).
 .TP
@@ -147,6 +147,47 @@ argument est ignoré avec un avertissement.
 .TP
 .B \-\-help
 Affiche l'aide en ligne et quitte.
+.SH COMPLETION
+Le paquet installe une complétion pour
+.B bash
+et
+.BR zsh .
+Elle complète :
+.IP \(bu 2
+le premier argument : noms des sessions tmux existantes et la
+sous\-commande
+.BR list ;
+.IP \(bu 2
+les flags courts et longs, dès que le mot courant commence par
+.BR \- ;
+.IP \(bu 2
+l'argument de
+.BR \-p / \-\-profile :
+noms de fichiers présents dans
+.IR ~/.ttmux/ ,
+ou complétion de chemin dès que le mot contient un
+.B /
+ou commence par
+.BR ~ ;
+.IP \(bu 2
+l'argument de
+.BR \-c :
+noms des commandes disponibles dans le
+.BR PATH .
+.PP
+Après
+.BR \-l ", " \-\-list ", " list " ou " \-\-help
+plus aucune complétion n'est proposée, ces modes étant exclusifs. De
+même, un seul argument positionnel étant accepté, aucun nom de session
+n'est proposé une fois qu'il est saisi.
+.PP
+Pour l'activer dans le shell bash courant sans rouvrir de terminal :
+.PP
+.RS
+.nf
+source /usr/share/bash\-completion/completions/ttmux
+.fi
+.RE
 .SH FICHIERS
 .TP
 .I ~/.ttmux/
@@ -154,6 +195,12 @@ Répertoire des profils utilisateur.
 .TP
 .I ~/.ttmux/base
 Profil chargé par défaut s'il existe.
+.TP
+.I /usr/share/bash-completion/completions/ttmux
+Complétion bash.
+.TP
+.I /usr/share/zsh/site-functions/_ttmux
+Complétion zsh.
 .SH EXAMPLES
 Attacher la seule session existante (ou créer
 .B main
@@ -178,11 +225,47 @@ ttmux dev \-p cnetcv
 .fi
 .RE
 .PP
-Créer une session sans aucun profil, layout entièrement en CLI :
+Créer une session sans aucun profil, layout entièrement en CLI —
+éditeur à gauche, ssh en haut à droite, htop en bas à droite :
 .PP
 .RS
 .nf
 ttmux dev \-N \-c 'cd ~/proj && nvim' \-h \-c 'ssh prod' \-v \-c 'htop'
+.fi
+.RE
+.PP
+Trois panes empilés pour du suivi de logs :
+.PP
+.RS
+.nf
+ttmux logs \-N \-c 'tail \-f /var/log/messages' \-v \-c 'journalctl \-f' \-v \-c 'htop'
+.fi
+.RE
+.PP
+Profil puis ajouts en ligne de commande (le profil est appliqué
+en premier) :
+.PP
+.RS
+.nf
+ttmux dev \-p cnetcv \-v \-c 'htop'
+.fi
+.RE
+.PP
+Charger un profil situé hors de
+.IR ~/.ttmux " :"
+.PP
+.RS
+.nf
+ttmux dev \-p ./layouts/dev.conf
+.fi
+.RE
+.PP
+Lister les sessions même s'il n'en existe que zéro ou une :
+.PP
+.RS
+.nf
+ttmux list
+ttmux \-l
 .fi
 .RE
 .SH EXIT STATUS

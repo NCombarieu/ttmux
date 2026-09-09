@@ -1,5 +1,5 @@
 Name:           ttmux
-Version:        1.3.0
+Version:        1.4.0
 Release:        1%{?dist}
 Summary:        Wrapper tmux pour attacher, lister ou créer une session avec un profil
 
@@ -16,7 +16,8 @@ ttmux est un wrapper bash autour de tmux qui simplifie l'attache, la
 création et le setup d'une session. Il peut charger un fichier de profil
 (par défaut ~/.ttmux/base) avec directive include, et appliquer une suite
 de splits et de commandes décrits soit dans le profil, soit en ligne de
-commande, soit les deux.
+commande, soit les deux. La complétion bash et zsh est fournie : sessions
+tmux existantes, profils de ~/.ttmux, flags et commandes.
 
 %prep
 %setup -q
@@ -27,12 +28,22 @@ commande, soit les deux.
 %install
 install -D -m 0755 ttmux %{buildroot}%{_bindir}/ttmux
 install -D -m 0644 ttmux.1 %{buildroot}%{_mandir}/man1/ttmux.1
+install -D -m 0644 completions/ttmux.bash %{buildroot}%{_datadir}/bash-completion/completions/ttmux
+install -D -m 0644 completions/_ttmux %{buildroot}%{_datadir}/zsh/site-functions/_ttmux
 
 %files
 %{_bindir}/ttmux
 %{_mandir}/man1/ttmux.1*
+%{_datadir}/bash-completion/completions/ttmux
+%{_datadir}/zsh/site-functions/_ttmux
 
 %changelog
+* Wed Sep 09 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.4.0-1
+- Complétion bash et zsh : sessions tmux existantes, profils de ~/.ttmux
+  (et chemins), flags courts et longs, commandes pour -c.
+- Aide (--help) restructurée avec des exemples pour chaque fonctionnalité.
+- Man page : section COMPLETION et exemples supplémentaires.
+
 * Thu May 14 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.3.0-1
 - Ajout du flag -l / --list et de la sous-commande "list" pour afficher
   les sessions tmux existantes (délègue à `tmux ls`).

@@ -1,0 +1,29 @@
+#compdef ttmux
+# zsh completion for ttmux(1)
+
+_ttmux_profiles() {
+  local dir=$HOME/.ttmux
+  local -a profiles
+  profiles=( ${dir}/*(N.:t) )
+  _alternative \
+    'profiles:profil ttmux:compadd -a profiles' \
+    'files:chemin de profil:_files'
+}
+
+_ttmux_first_arg() {
+  local -a sessions cmds
+  sessions=( ${(f)"$(tmux ls -F '#{session_name}' 2>/dev/null)"} )
+  cmds=( 'list:lister les sessions tmux existantes' )
+  _describe -t ttmux-commands 'sous-commande' cmds
+  _describe -t ttmux-sessions 'session tmux' sessions
+}
+
+_arguments -S \
+  '(- *)--help[affiche l'\''aide complète avec exemples]' \
+  '(- *)'{-l,--list}'[liste les sessions tmux existantes]' \
+  '(-N --no-config)'{-p,--profile}'[charge un profil au lieu de ~/.ttmux/base]:profil:_ttmux_profiles' \
+  '(-p --profile)'{-N,--no-config}'[ne charge aucun profil]' \
+  '*-c[envoie une commande + Entrée dans le pane courant]:commande:_command_names -e' \
+  '*-h[split horizontal (nouveau pane à droite, devient courant)]' \
+  '*-v[split vertical (nouveau pane en bas, devient courant)]' \
+  '1:session:_ttmux_first_arg'

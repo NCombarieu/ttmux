@@ -17,6 +17,7 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 - [Pourquoi](#pourquoi)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Complétion](#complétion)
 - [Profils](#profils)
 - [Construction du RPM](#construction-du-rpm)
 - [Licence](#licence)
@@ -58,8 +59,9 @@ puis :
 sudo dnf install ./ttmux-*.noarch.rpm
 ```
 
-Installe `/usr/bin/ttmux` (disponible pour tous les utilisateurs) et
-`/usr/share/man/man1/ttmux.1.gz`.
+Installe `/usr/bin/ttmux` (disponible pour tous les utilisateurs), la page
+de manuel `/usr/share/man/man1/ttmux.1.gz` et la
+[complétion](#complétion) bash et zsh.
 
 ### Depuis les sources
 
@@ -83,7 +85,10 @@ sudo make install        # installe dans /usr/bin et /usr/share/man/man1
 
 ```sh
 sudo dnf remove ttmux               # si installé via RPM ou dépôt
-sudo rm /usr/bin/ttmux /usr/share/man/man1/ttmux.1*  # si installé via make install
+# si installé via make install :
+sudo rm /usr/bin/ttmux /usr/share/man/man1/ttmux.1* \
+        /usr/share/bash-completion/completions/ttmux \
+        /usr/share/zsh/site-functions/_ttmux
 # Supprimer aussi le dépôt si ajouté :
 sudo rm /etc/yum.repos.d/ttmux.repo
 ```
@@ -129,8 +134,8 @@ rend le nouveau pane actif pour les flags suivants.
 | `-c <cmd>`       | envoie `<cmd>` + Entrée dans le pane courant             |
 | `-h`             | split horizontal (nouveau pane à droite, devient actif)  |
 | `-v`             | split vertical (nouveau pane en bas, devient actif)      |
-| `-p <nom\|chemin>` | charge un profil au lieu de `base`                     |
-| `-N`             | désactive le chargement du profil par défaut             |
+| `-p`, `--profile <nom\|chemin>` | charge un profil au lieu de `base`       |
+| `-N`, `--no-config` | désactive le chargement du profil par défaut          |
 | `-l`, `--list`   | liste les sessions tmux (équivalent : `ttmux list`)      |
 
 Exemple — éditeur à gauche, SSH en haut à droite, `htop` en bas à droite :
@@ -144,8 +149,45 @@ L'ordre d'application est toujours **profil d'abord, CLI ensuite**.
 ### Aide
 
 ```sh
-ttmux --help     # aide en ligne
+ttmux --help     # aide en ligne, avec un exemple par fonctionnalité
 man ttmux        # page de manuel complète (après install RPM)
+```
+
+## Complétion
+
+Le paquet installe la complétion **bash** et **zsh**. Elle est active dans
+tout nouveau shell ; pour l'activer immédiatement dans le shell bash
+courant :
+
+```sh
+source /usr/share/bash-completion/completions/ttmux
+```
+
+Ce qui est complété :
+
+| Contexte                 | Candidats proposés                                    |
+|--------------------------|-------------------------------------------------------|
+| `ttmux <TAB>`            | sessions tmux existantes + sous-commande `list`       |
+| `ttmux -<TAB>`           | flags courts et longs                                 |
+| `ttmux dev -p <TAB>`     | fichiers de `~/.ttmux/`                               |
+| `ttmux dev -p ./<TAB>`   | complétion de chemin (dès un `/` ou un `~`)           |
+| `ttmux dev -c <TAB>`     | commandes disponibles dans le `PATH`                  |
+
+Les modes exclusifs (`list`, `-l`, `--list`, `--help`) ne proposent plus
+rien après eux, et le nom de session n'est proposé qu'une fois, puisqu'un
+seul argument positionnel est accepté.
+
+```sh
+ttmux <TAB>              # → list  main  work
+ttmux work -p <TAB>      # → base  cnetcv  common
+ttmux work -c ngi<TAB>   # → nginx
+```
+
+Fichiers installés :
+
+```
+/usr/share/bash-completion/completions/ttmux
+/usr/share/zsh/site-functions/_ttmux
 ```
 
 ## Profils
@@ -204,8 +246,9 @@ make clean       # nettoie le tarball
 make distclean   # nettoie aussi le BUILD/ et les RPM produits
 ```
 
-Pour bumper la version : éditer `VERSION` dans `Makefile` et `Version`
-dans `ttmux.spec`, ajouter une entrée `%changelog`, puis `make rpm`.
+Pour bumper la version : éditer `VERSION` dans `Makefile`, `Version` dans
+`ttmux.spec` et l'en-tête `.TH` de `ttmux.1`, ajouter une entrée
+`%changelog`, puis `make rpm`.
 
 ## Licence
 
