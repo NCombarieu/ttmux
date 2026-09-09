@@ -1,21 +1,29 @@
 NAME     := ttmux
-VERSION  := 1.4.0
+VERSION  := 1.5.0
 RPMBUILD ?= $(HOME)/rpmbuild
 
 PREFIX      ?= /usr
 BASHCOMPDIR ?= $(PREFIX)/share/bash-completion/completions
 ZSHCOMPDIR  ?= $(PREFIX)/share/zsh/site-functions
 
-.PHONY: all tarball rpm install clean distclean
+.PHONY: all test lint tarball rpm install clean distclean
 
 all: rpm
+
+# Suite de tests : serveur tmux et profils jetables, rien n'est touché
+# dans l'environnement de l'utilisateur.
+test:
+	@bash tests/run.sh $(T)
+
+lint:
+	@shellcheck -s bash $(NAME) tests/run.sh completions/$(NAME).bash
 
 tarball:
 	@mkdir -p $(RPMBUILD)/SOURCES
 	@tmp=$$(mktemp -d) && \
 	  mkdir $$tmp/$(NAME)-$(VERSION) && \
 	  cp $(NAME) $(NAME).1 $$tmp/$(NAME)-$(VERSION)/ && \
-	  cp -r completions $$tmp/$(NAME)-$(VERSION)/ && \
+	  cp -r completions tests $$tmp/$(NAME)-$(VERSION)/ && \
 	  tar czf $(RPMBUILD)/SOURCES/$(NAME)-$(VERSION).tar.gz -C $$tmp $(NAME)-$(VERSION) && \
 	  rm -rf $$tmp
 	@echo "-> $(RPMBUILD)/SOURCES/$(NAME)-$(VERSION).tar.gz"

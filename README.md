@@ -19,6 +19,7 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 - [Usage](#usage)
 - [Complétion](#complétion)
 - [Profils](#profils)
+- [Développement](#développement)
 - [Construction du RPM](#construction-du-rpm)
 - [Licence](#licence)
 
@@ -129,14 +130,27 @@ ttmux work       # attache 'work' si elle existe, sinon la crée
 Les flags sont appliqués **dans l'ordre** sur le pane courant. Un split
 rend le nouveau pane actif pour les flags suivants.
 
-| Flag             | Effet                                                    |
-|------------------|----------------------------------------------------------|
-| `-c <cmd>`       | envoie `<cmd>` + Entrée dans le pane courant             |
-| `-h`             | split horizontal (nouveau pane à droite, devient actif)  |
-| `-v`             | split vertical (nouveau pane en bas, devient actif)      |
-| `-p`, `--profile <nom\|chemin>` | charge un profil au lieu de `base`       |
-| `-N`, `--no-config` | désactive le chargement du profil par défaut          |
-| `-l`, `--list`   | liste les sessions tmux (équivalent : `ttmux list`)      |
+Flags de **layout** (appliqués dans l'ordre, sur le pane courant) :
+
+| Flag                  | Effet                                                    |
+|-----------------------|----------------------------------------------------------|
+| `-c <cmd>`            | envoie `<cmd>` + Entrée dans le pane courant             |
+| `-h`, `-h<N>`         | split horizontal (pane à droite, devient actif) ; `<N>` = % de largeur |
+| `-v`, `-v<N>`         | split vertical (pane en bas, devient actif) ; `<N>` = % de hauteur |
+| `-w`, `--window <nom>`| nouvelle fenêtre nommée (devient courante)               |
+
+Autres flags :
+
+| Flag                  | Effet                                                    |
+|-----------------------|----------------------------------------------------------|
+| `-p`, `--profile <nom\|chemin>` | charge un profil au lieu de `base`            |
+| `-N`, `--no-config`   | désactive le chargement du profil par défaut             |
+| `-C`, `--cd <dir>`    | répertoire de travail de la session créée                |
+| `-d`, `--detach`      | crée et configure la session sans l'attacher             |
+| `--dry-run`           | affiche les commandes tmux au lieu de les exécuter       |
+| `-l`, `--list`        | liste les sessions tmux (équivalent : `ttmux list`)      |
+| `--`                  | fin des options : l'argument suivant est le nom de session |
+| `-V`, `--version`     | affiche la version                                       |
 
 Exemple — éditeur à gauche, SSH en haut à droite, `htop` en bas à droite :
 
@@ -145,6 +159,33 @@ ttmux dev -N -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 ```
 
 L'ordre d'application est toujours **profil d'abord, CLI ensuite**.
+
+Quelques variantes :
+
+```sh
+ttmux dev -N -c nvim -h25 -c 'watch make test'   # sidebar de 25 %
+ttmux dev -N -c nvim -w logs -c 'journalctl -f'  # deux fenêtres nommées
+ttmux api -C ~/proj/api -d -c 'make run'         # préparée, non attachée
+ttmux -- -scratch                                # nom commençant par un tiret
+```
+
+### Vérifier sans rien lancer
+
+`--dry-run` affiche les commandes `tmux` qui seraient exécutées, sans
+créer quoi que ce soit — pratique pour déboguer un profil et son ordre
+d'application :
+
+```console
+$ ttmux dev -p cnetcv --dry-run
+tmux new-session -d -s dev -c /home/noel/proj
+tmux send-keys -t '<pane0>' nvim C-m
+tmux split-window -h -p 30 -t '<pane0>'
+tmux send-keys -t '<pane1>' 'ssh prod-host' C-m
+tmux attach-session -t =dev
+```
+
+`<paneN>` est la cible symbolique du pane courant : `N` s'incrémente à
+chaque split et à chaque nouvelle fenêtre.
 
 ### Aide
 
@@ -172,8 +213,10 @@ Ce qui est complété :
 | `ttmux dev -p <TAB>`     | fichiers de `~/.ttmux/`                               |
 | `ttmux dev -p ./<TAB>`   | complétion de chemin (dès un `/` ou un `~`)           |
 | `ttmux dev -c <TAB>`     | commandes disponibles dans le `PATH`                  |
+| `ttmux dev -C <TAB>`     | répertoires                                           |
 
-Les modes exclusifs (`list`, `-l`, `--list`, `--help`) ne proposent plus
+Les modes exclusifs (`list`, `-l`, `--list`, `--help`, `-V`, `--version`)
+ne proposent plus
 rien après eux, et le nom de session n'est proposé qu'une fois, puisqu'un
 seul argument positionnel est accepté.
 
@@ -228,7 +271,14 @@ include common
 | `nom` (sans `/`)     | `~/.ttmux/<nom>` si présent, sinon relatif au fichier courant |
 
 Les inclusions cycliques sont détectées et ignorées (chaque fichier est
-parcouru au plus une fois par invocation).
+parcouru au plus une fois par invocation). En revanche une inclusion
+**introuvable**, un flag inconnu ou une ligne mal quotée sont des
+erreurs : `ttmux` s'arrête *avant* de créer la session, qui n'est donc
+jamais laissée à moitié montée.
+
+Les flags acceptés dans un profil sont les flags de layout (`-c`, `-h`,
+`-v`, `-w`) et `-C`. Un `-C` passé en ligne de commande l'emporte sur
+celui du profil.
 
 ### Choix d'un profil alternatif
 
@@ -237,6 +287,22 @@ ttmux dev -p cnetcv          # charge ~/.ttmux/cnetcv
 ttmux dev -p ./foo.conf      # charge un chemin
 ttmux dev -N                 # ne charge AUCUN profil
 ```
+
+La variable d'environnement `TTMUX_PROFILE_DIR` remplace `~/.ttmux` si
+l'on veut ranger ses profils ailleurs.
+
+## Développement
+
+```sh
+make test        # suite de tests (bash + tmux, aucune autre dépendance)
+make test T=profile   # ne joue que les tests dont le nom contient "profile"
+make lint        # shellcheck sur ttmux, les tests et la complétion bash
+```
+
+Les tests tournent contre un serveur tmux jetable (`TMUX_TMPDIR` dédié) et
+un répertoire de profils temporaire : ni les sessions ni la configuration
+de l'utilisateur ne sont touchées. Ils sont aussi joués en `%check` lors du
+`rpmbuild`.
 
 ## Construction du RPM
 
@@ -247,8 +313,9 @@ make distclean   # nettoie aussi le BUILD/ et les RPM produits
 ```
 
 Pour bumper la version : éditer `VERSION` dans `Makefile`, `Version` dans
-`ttmux.spec` et l'en-tête `.TH` de `ttmux.1`, ajouter une entrée
-`%changelog`, puis `make rpm`.
+`ttmux.spec`, `VERSION` dans `ttmux` et l'en-tête `.TH` de `ttmux.1`,
+ajouter une entrée `%changelog`, puis `make rpm`. Un test vérifie que le
+script, le `Makefile` et le `.spec` annoncent bien la même version.
 
 ## Licence
 

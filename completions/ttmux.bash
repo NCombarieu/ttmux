@@ -1,7 +1,7 @@
 # bash completion for ttmux(1)                             -*- shell-script -*-
 
 _ttmux_profiles() {
-  local dir="$HOME/.ttmux" f
+  local dir="${TTMUX_PROFILE_DIR:-$HOME/.ttmux}" f
   [[ -d $dir ]] || return 0
   for f in "$dir"/*; do
     [[ -f $f ]] && printf '%s\n' "${f##*/}"
@@ -28,13 +28,20 @@ _ttmux_complete_profile() {
     if declare -F _filedir >/dev/null 2>&1; then
       _filedir
     else
-      local IFS=$'\n'
-      COMPREPLY=( $(compgen -f -- "$cur") )
+      mapfile -t COMPREPLY < <(compgen -f -- "$cur")
     fi
   else
-    local IFS=$'\n'
-    COMPREPLY=( $(compgen -W "$(_ttmux_profiles)" -- "$cur") )
+    mapfile -t COMPREPLY < <(compgen -W "$(_ttmux_profiles)" -- "$cur")
     _ttmux_escape_reply
+  fi
+}
+
+_ttmux_complete_dir() {
+  local cur=$1
+  if declare -F _filedir >/dev/null 2>&1; then
+    _filedir -d
+  else
+    mapfile -t COMPREPLY < <(compgen -d -- "$cur")
   fi
 }
 
@@ -56,31 +63,42 @@ _ttmux() {
       _ttmux_complete_profile "$cur"
       return 0
       ;;
+    -C|--cd)
+      _ttmux_complete_dir "$cur"
+      return 0
+      ;;
     -c)
-      local IFS=$'\n'
-      COMPREPLY=( $(compgen -c -- "$cur" | sort -u) )
+      mapfile -t COMPREPLY < <(compgen -c -- "$cur" | sort -u)
+      return 0
+      ;;
+    -w|--window)
+      # Nom de fenêtre libre : rien de pertinent à proposer.
       return 0
       ;;
   esac
 
-  # 2. Ce qui a déjà été saisi : session positionnelle, mode exclusif.
-  local i w skip=0 seen_session=0 exclusive=0
+  # 2. Ce qui a déjà été saisi : session positionnelle, mode exclusif, "--".
+  local i w skip=0 seen_session=0 exclusive=0 dashdash=0
   for (( i = 1; i < cword; i++ )); do
     w=${words[i]}
     if (( skip )); then skip=0; continue; fi
+    if (( dashdash )); then seen_session=1; continue; fi
     case $w in
-      -c|-p|--profile)  skip=1 ;;
-      -l|--list|--help) exclusive=1 ;;
-      -*)               ;;
-      list)             if (( i == 1 )); then exclusive=1; else seen_session=1; fi ;;
-      *)                seen_session=1 ;;
+      -c|-p|--profile|-C|--cd|-w|--window) skip=1 ;;
+      -l|--list|--help|-V|--version)       exclusive=1 ;;
+      --)                                  dashdash=1 ;;
+      -*)                                  ;;
+      list) if (( i == 1 )); then exclusive=1; else seen_session=1; fi ;;
+      *)                                   seen_session=1 ;;
     esac
   done
   (( exclusive )) && return 0
 
-  # 3. Flags.
-  if [[ $cur == -* ]]; then
-    COMPREPLY=( $(compgen -W '-c -h -v -p --profile -N --no-config -l --list --help' -- "$cur") )
+  # 3. Flags (plus proposés après "--", qui force l'argument positionnel).
+  if [[ $cur == -* && $dashdash -eq 0 ]]; then
+    mapfile -t COMPREPLY < <(compgen -W '-c -h -v -w --window -p --profile
+      -N --no-config -C --cd -d --detach --dry-run -l --list --help
+      -V --version --' -- "$cur")
     return 0
   fi
 
@@ -89,8 +107,7 @@ _ttmux() {
   local candidates
   candidates=$(_ttmux_sessions)
   (( cword == 1 )) && candidates=$'list\n'$candidates
-  local IFS=$'\n'
-  COMPREPLY=( $(compgen -W "$candidates" -- "$cur") )
+  mapfile -t COMPREPLY < <(compgen -W "$candidates" -- "$cur")
   _ttmux_escape_reply
 }
 

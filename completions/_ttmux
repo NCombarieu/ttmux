@@ -2,7 +2,7 @@
 # zsh completion for ttmux(1)
 
 _ttmux_profiles() {
-  local dir=$HOME/.ttmux
+  local dir=${TTMUX_PROFILE_DIR:-$HOME/.ttmux}
   local -a profiles
   profiles=( ${dir}/*(N.:t) )
   _alternative \
@@ -20,10 +20,15 @@ _ttmux_first_arg() {
 
 _arguments -S \
   '(- *)--help[affiche l'\''aide complète avec exemples]' \
+  '(- *)'{-V,--version}'[affiche la version]' \
   '(- *)'{-l,--list}'[liste les sessions tmux existantes]' \
   '(-N --no-config)'{-p,--profile}'[charge un profil au lieu de ~/.ttmux/base]:profil:_ttmux_profiles' \
   '(-p --profile)'{-N,--no-config}'[ne charge aucun profil]' \
+  {-C,--cd}'[répertoire de travail de la session créée]:répertoire:_directories' \
+  {-d,--detach}'[crée et configure la session sans l'\''attacher]' \
+  '--dry-run[affiche les commandes tmux au lieu de les exécuter]' \
   '*-c[envoie une commande + Entrée dans le pane courant]:commande:_command_names -e' \
-  '*-h[split horizontal (nouveau pane à droite, devient courant)]' \
-  '*-v[split vertical (nouveau pane en bas, devient courant)]' \
+  '*-h[split horizontal (nouveau pane à droite, devient courant) ; -h<N> pour un pourcentage]' \
+  '*-v[split vertical (nouveau pane en bas, devient courant) ; -v<N> pour un pourcentage]' \
+  '*'{-w,--window}'[nouvelle fenêtre (devient courante)]:nom de fenêtre:' \
   '1:session:_ttmux_first_arg'

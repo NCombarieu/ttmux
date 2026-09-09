@@ -1,4 +1,4 @@
-.TH TTMUX 1 "2026-09-09" "ttmux 1.4.0" "User Commands"
+.TH TTMUX 1 "2026-09-09" "ttmux 1.5.0" "User Commands"
 .SH NAME
 ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
@@ -7,12 +7,17 @@ ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .RB [ \-p
 .IR nom | chemin ]
 .RB [ \-N ]
+.RI [ "\-C " dir ]
+.RB [ \-d ]
+.RB [ \-\-dry\-run ]
 .RI [ "\-c " cmd ]
-.RB [ \-h ]
-.RB [ \-v ]
+.RB [ \-h [ N ]]
+.RB [ \-v [ N ]]
+.RI [ "\-w " nom ]
 .IR ...
 .br
-.B ttmux \-\-help
+.B ttmux
+.RB [ \-\-help | \-V | \-\-version ]
 .br
 .B ttmux list
 |
@@ -28,8 +33,8 @@ charger un fichier de
 .I profil
 (par défaut
 .IR ~/.ttmux/base )
-et appliquer une suite de splits et de commandes décrits soit dans le
-profil, soit en ligne de commande, soit les deux.
+et appliquer une suite de splits, de fenêtres et de commandes décrits soit
+dans le profil, soit en ligne de commande, soit les deux.
 .PP
 Le profil et les flags de setup sont appliqués
 .B uniquement à la création
@@ -94,7 +99,17 @@ nom simple :
 si présent, sinon relatif au fichier courant.
 .PP
 Les inclusions cycliques sont détectées et ignorées (chaque fichier est
-parcouru au plus une fois par invocation).
+parcouru au plus une fois par invocation). En revanche une inclusion
+introuvable, un flag inconnu ou une ligne mal quotée sont des erreurs :
+.B ttmux
+s'arrête
+.I avant
+de créer la session, qui n'est donc jamais laissée à moitié montée.
+.PP
+Les flags acceptés dans un profil sont les flags de layout
+.RB ( \-c ", " \-h ", " \-v ", " \-w )
+et
+.BR \-C .
 .PP
 Exemple
 .IR ~/.ttmux/base " :"
@@ -114,7 +129,9 @@ Charge le profil donné au lieu du
 par défaut. Si l'argument contient un
 .B /
 ou commence par
-.BR ./ / ../ /
+.BR ./ ,
+.B ../
+ou
 .BR / ,
 il est traité comme un chemin ; sinon il est cherché dans
 .IR ~/.ttmux/ .
@@ -129,13 +146,56 @@ Envoie
 .I cmd
 suivi de la touche Entrée dans le pane courant.
 .TP
-.B \-h
+.BR \-h ", " \-h N
 Effectue un split horizontal (nouveau pane à droite). Le nouveau pane
-devient le pane courant pour les flags suivants.
+devient le pane courant pour les flags suivants. La forme collée
+.BI \-h N
+fixe la taille du nouveau pane à
+.I N
+pour cent (1\-99), par exemple
+.BR \-h30 .
 .TP
-.B \-v
+.BR \-v ", " \-v N
 Effectue un split vertical (nouveau pane en bas). Le nouveau pane
-devient le pane courant pour les flags suivants.
+devient le pane courant pour les flags suivants. La forme collée
+.BI \-v N
+fixe la taille du nouveau pane à
+.I N
+pour cent (1\-99).
+.TP
+.BI \-w " nom" ", " \-\-window " nom"
+Crée une nouvelle fenêtre nommée
+.I nom
+dans la session. Elle devient la fenêtre courante : les flags suivants
+s'appliquent à son pane.
+.TP
+.BI \-C " dir" ", " \-\-cd " dir"
+Fixe le répertoire de travail de la session créée
+.RB ( "tmux new\-session \-c" ).
+Un
+.B ~
+en tête est développé. Échec si le répertoire n'existe pas. Accepté aussi
+dans un profil ; la valeur passée en ligne de commande l'emporte.
+.TP
+.BR \-d ", " \-\-detach
+Crée et configure la session sans l'attacher. Sur une session existante,
+ne fait rien. Utile dans un script ou pour préparer plusieurs sessions
+d'avance.
+.TP
+.B \-\-dry\-run
+N'exécute rien : affiche sur la sortie standard les commandes
+.B tmux
+qui seraient lancées. La cible de chaque commande est notée
+.IR <paneN> ,
+N s'incrémentant à chaque split ou nouvelle fenêtre. Pratique pour
+vérifier l'expansion d'un profil et l'ordre d'application des flags.
+.TP
+.BR \-V ", " \-\-version
+Affiche la version et quitte.
+.TP
+.B \-\-
+Termine l'analyse des options : l'argument suivant est traité comme le
+nom de session, même s'il commence par un tiret.
 .TP
 .BR \-l ", " \-\-list ", " list
 Liste les sessions tmux existantes (délègue à
@@ -188,10 +248,23 @@ Pour l'activer dans le shell bash courant sans rouvrir de terminal :
 source /usr/share/bash\-completion/completions/ttmux
 .fi
 .RE
+.SH ENVIRONNEMENT
+.TP
+.B TTMUX_PROFILE_DIR
+Remplace
+.I ~/.ttmux
+comme répertoire de profils.
+.TP
+.B TMUX
+Si cette variable est définie (donc à l'intérieur de tmux),
+.B switch\-client
+est utilisé à la place de
+.BR attach\-session .
 .SH FICHIERS
 .TP
 .I ~/.ttmux/
-Répertoire des profils utilisateur.
+Répertoire des profils utilisateur (voir
+.BR TTMUX_PROFILE_DIR ).
 .TP
 .I ~/.ttmux/base
 Profil chargé par défaut s'il existe.
@@ -268,6 +341,38 @@ ttmux list
 ttmux \-l
 .fi
 .RE
+Sidebar occupant 25 % de la largeur :
+.PP
+.RS
+.nf
+ttmux dev \-N \-c nvim \-h25 \-c 'watch make test'
+.fi
+.RE
+.PP
+Deux fenêtres nommées, session enracinée dans un répertoire et créée sans
+être attachée :
+.PP
+.RS
+.nf
+ttmux api \-C ~/proj/api \-d \-c 'make run' \-w logs \-c 'journalctl \-f'
+.fi
+.RE
+.PP
+Vérifier ce que produirait un profil, sans rien lancer :
+.PP
+.RS
+.nf
+ttmux dev \-p cnetcv \-\-dry\-run
+.fi
+.RE
+.PP
+Créer une session dont le nom commence par un tiret :
+.PP
+.RS
+.nf
+ttmux \-\- \-scratch
+.fi
+.RE
 .SH EXIT STATUS
 .TP
 .B 0
@@ -275,8 +380,10 @@ Succès.
 .TP
 .B 1
 Erreur d'usage : flag inconnu, argument manquant pour
-.BR \-c " ou " \-p ,
-profil introuvable, argument positionnel inattendu.
+.BR \-c ", " \-p ", " \-w " ou " \-C ,
+profil ou inclusion introuvable, ligne de profil invalide, taille de
+split hors bornes, répertoire de travail inexistant, nom de session
+invalide, argument positionnel inattendu.
 .SH SEE ALSO
 .BR tmux (1)
 .SH AUTHOR
