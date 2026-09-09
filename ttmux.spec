@@ -1,5 +1,5 @@
 Name:           ttmux
-Version:        1.5.0
+Version:        1.5.1
 Release:        1%{?dist}
 Summary:        Wrapper tmux pour attacher, lister ou créer une session avec un profil
 
@@ -8,9 +8,9 @@ URL:            https://github.com/NCombarieu/ttmux
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
-Requires:       tmux
+Requires:       tmux >= 3.1
 Requires:       bash
-BuildRequires:  tmux
+BuildRequires:  tmux >= 3.1
 BuildRequires:  bash
 
 %description
@@ -46,6 +46,15 @@ install -D -m 0644 completions/_ttmux %{buildroot}%{_datadir}/zsh/site-functions
 %{_datadir}/zsh/site-functions/_ttmux
 
 %changelog
+* Wed Sep 09 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.5.1-1
+- Les splits en pourcentage utilisent « split-window -l <N>% » au lieu de
+  « -p <N> », option dépréciée et absente des tmux récents : -h<N>/-v<N>
+  échouait sur ces versions. Requires: tmux >= 3.1 en conséquence.
+- Tests : HOME isolé (le ~/.tmux.conf de l'utilisateur n'influence plus
+  les tests), taille de session fixée pour vérifier la largeur du pane
+  issu d'un split en pourcentage, et attente de l'arrêt effectif du
+  serveur tmux entre deux tests.
+
 * Wed Sep 09 2026 Noel Combarieu <noel.combarieu@gmail.com> - 1.5.0-1
 - Nouveaux flags : -V/--version, -d/--detach (créer sans attacher),
   -C/--cd <dir> (répertoire de travail de la session), -w/--window <nom>

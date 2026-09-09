@@ -15,7 +15,12 @@ TTMUX=${TTMUX:-"$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/ttmux"}
 TMPROOT=$(mktemp -d /tmp/ttmux-test.XXXXXX)
 export TMUX_TMPDIR="$TMPROOT/sock"
 export TTMUX_PROFILE_DIR="$TMPROOT/profiles"
-mkdir -p "$TMUX_TMPDIR" "$TTMUX_PROFILE_DIR"
+# HOME isolé : le ~/.tmux.conf de l'utilisateur ne doit pas influencer les
+# tests, et la taille des sessions détachées doit être connue pour vérifier
+# les splits en pourcentage.
+export HOME="$TMPROOT/home"
+mkdir -p "$TMUX_TMPDIR" "$TTMUX_PROFILE_DIR" "$HOME"
+printf 'set -g default-size 200x50\n' > "$HOME/.tmux.conf"
 # ttmux ne doit jamais croire qu'il tourne dans un tmux.
 unset TMUX
 
@@ -30,9 +35,16 @@ trap cleanup EXIT
 
 # --- Helpers ------------------------------------------------------------------
 
-# Réinitialise serveur tmux et profils entre deux tests.
+# Réinitialise serveur tmux et profils entre deux tests. On attend la mort
+# effective du serveur : le recréer trop tôt donne des « server exited
+# unexpectedly » intermittents.
 reset_env() {
+  local i
   tmux kill-server 2>/dev/null
+  for (( i = 0; i < 50; i++ )); do
+    tmux has-session 2>/dev/null || break
+    sleep 0.02
+  done
   rm -rf "$TTMUX_PROFILE_DIR"
   mkdir -p "$TTMUX_PROFILE_DIR"
 }
@@ -157,11 +169,16 @@ t_layout_splits() {
 
 test_case t_split_percentage
 t_split_percentage() {
-  tmux new-session -d -s tmp -x 200 -y 50 2>/dev/null
-  tmux kill-session -t tmp 2>/dev/null
   run dev -N -d -h25
   check "code retour" rc 0 "$RC"
   check "deux panes" n 2 "$(panes dev)"
+  # default-size vaut 200x50 (cf. le .tmux.conf du HOME isolé) : le pane de
+  # droite doit faire ~25 % de 200 colonnes, séparateur compris.
+  local width
+  width=$(tmux list-panes -t '=dev' -F '#{pane_width}' | tail -n1)
+  if (( width < 45 || width > 55 )); then
+    check "largeur du pane de droite (~50 colonnes)" w "45..55" "$width"
+  fi
 }
 
 test_case t_split_percentage_invalid

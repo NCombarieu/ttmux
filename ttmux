@@ -2,7 +2,7 @@
 # ttmux — wrapper tmux pour attacher/lister/setup une session avec profils.
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.5.1"
 DEFAULT_NAME="main"
 PROFILE_DIR="${TTMUX_PROFILE_DIR:-$HOME/.ttmux}"
 DEFAULT_PROFILE="base"
@@ -294,8 +294,10 @@ apply_flags() {
         target=$(active_target "$session")
         shift ;;
       -h*|-v*)
+        # « -p <N> » est déprécié et absent des tmux récents : on utilise
+        # la forme « -l <N>% », disponible depuis tmux 3.1.
         size="${1:2}"
-        run_tmux split-window "${1:0:2}" -p "$size" -t "$target"
+        run_tmux split-window "${1:0:2}" -l "$size%" -t "$target"
         (( ++_dry_pane ))
         target=$(active_target "$session")
         shift ;;

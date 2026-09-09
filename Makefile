@@ -1,5 +1,5 @@
 NAME     := ttmux
-VERSION  := 1.5.0
+VERSION  := 1.5.1
 RPMBUILD ?= $(HOME)/rpmbuild
 
 PREFIX      ?= /usr

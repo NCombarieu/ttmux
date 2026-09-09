@@ -1,4 +1,4 @@
-.TH TTMUX 1 "2026-09-09" "ttmux 1.5.0" "User Commands"
+.TH TTMUX 1 "2026-09-09" "ttmux 1.5.1" "User Commands"
 .SH NAME
 ttmux \- wrapper tmux pour attacher, lister ou créer une session avec un profil
 .SH SYNOPSIS
@@ -384,6 +384,14 @@ Erreur d'usage : flag inconnu, argument manquant pour
 profil ou inclusion introuvable, ligne de profil invalide, taille de
 split hors bornes, répertoire de travail inexistant, nom de session
 invalide, argument positionnel inattendu.
+.SH NOTES
+Les splits en pourcentage
+.RB ( \-h N ", " \-v N )
+utilisent
+.B "tmux split\-window \-l <N>%"
+et demandent donc
+.B tmux
+3.1 ou plus récent.
 .SH SEE ALSO
 .BR tmux (1)
 .SH AUTHOR

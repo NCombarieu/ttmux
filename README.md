@@ -38,7 +38,7 @@ ttmux dev -c 'cd ~/proj && nvim' -h -c 'ssh prod-host' -v -c 'htop'
 
 ## Installation
 
-Prérequis : `tmux` (résolu automatiquement par le RPM) et une distribution
+Prérequis : `tmux` >= 3.1 (résolu automatiquement par le RPM) et une distribution
 RPM-based (Fedora, RHEL, AlmaLinux, Rocky…).
 
 ### Via le dépôt DNF (recommandé — permet `dnf update`)
@@ -179,7 +179,7 @@ d'application :
 $ ttmux dev -p cnetcv --dry-run
 tmux new-session -d -s dev -c /home/noel/proj
 tmux send-keys -t '<pane0>' nvim C-m
-tmux split-window -h -p 30 -t '<pane0>'
+tmux split-window -h -l 30% -t '<pane0>'
 tmux send-keys -t '<pane1>' 'ssh prod-host' C-m
 tmux attach-session -t =dev
 ```
